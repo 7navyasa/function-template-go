@@ -1,0 +1,23 @@
+apiVersion: example.org/v1alpha1
+kind: Example
+metadata:
+  name: example
+spec:
+  parameters:
+    tableName: "example-table"
+    billingMode: "PAY_PER_REQUEST"
+    attributeDefinitions:
+      - attributeName: "id"
+        attributeType: "S"
+    keySchema:
+      - attributeName: "id"
+        keyType: "HASH"
+    enableKinesisStream: true
+    kinesisStreamName: "example-stream"
+  composedTemplate:
+    ref:
+      apiVersion: example.org/v1alpha1
+      kind: ComposedTemplate
+    selector:
+      compositionFunction:
+        name: dynamodb-with-kinesis

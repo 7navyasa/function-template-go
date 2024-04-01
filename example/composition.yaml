@@ -1,17 +1,11 @@
-apiVersion: apiextensions.crossplane.io/v1
-kind: Composition
+apiVersion: composition.crossplane.io/v1alpha1
+kind: CompositionFunction
 metadata:
-  name: function-template-go
+  name: dynamodb-with-kinesis
 spec:
-  compositeTypeRef:
-    apiVersion: example.crossplane.io/v1
-    kind: XR
-  mode: Pipeline
-  pipeline:
-  - step: run-the-template
-    functionRef:
-      name: function-template-go
-    input:
-      apiVersion: template.fn.crossplane.io/v1beta1
-      kind: Input
-      example: "Hello world"
+  compositionFunctionType: go-composition
+  compositionFunctionSource:
+    go:
+      functionSourceCodeReference:
+        fromSource: true
+        sourceCodeDirectory: github.com/7navyasa/function-template-go/fn.go
