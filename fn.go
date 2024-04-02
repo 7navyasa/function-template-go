@@ -3,26 +3,20 @@ package main
 import (
 	"context"
 
-	"github.com/crossplane/crossplane-runtime/pkg/errors"
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/pkg/resource/unstructured"
-	"github.com/crossplane/crossplane-runtime/pkg/resource/unstructured/composed"
-	fnv1beta1 "github.com/crossplane/function-sdk-go/proto/v1beta1"
-	"github.com/crossplane/function-sdk-go/request"
-	"github.com/crossplane/function-sdk-go/response"
-	"github.com/7navyasa/function-template-go/input/v1beta1"
+	unstructured "github.com/crossplane/crossplane-runtime/pkg/resource/unstructured"
+	composed "github.com/crossplane/crossplane-runtime/pkg/resource/unstructured/composed"
 )
 
 // InputParameters defines the input parameters for the Composition Function.
 type InputParameters struct {
-	TableName             string                 `json:"tableName"`
-	BillingMode           string                 `json:"billingMode"`
-	AttributeDefinitions  []AttributeDefinition  `json:"attributeDefinitions"`
-	KeySchema             []KeySchema            `json:"keySchema"`
+	TableName            string                `json:"tableName"`
+	BillingMode          string                `json:"billingMode"`
+	AttributeDefinitions []AttributeDefinition `json:"attributeDefinitions"`
+	KeySchema            []KeySchema           `json:"keySchema"`
 	ProvisionedThroughput *ProvisionedThroughput `json:"provisionedThroughput,omitempty"`
-	EnableKinesisStream   bool                   `json:"enableKinesisStream"`
-	KinesisStreamName     string                 `json:"kinesisStreamName,omitempty"`
+	EnableKinesisStream  bool                   `json:"enableKinesisStream"`
+	KinesisStreamName    string                `json:"kinesisStreamName,omitempty"`
 }
 
 // AttributeDefinition represents an attribute definition for the DynamoDB table.
@@ -45,7 +39,7 @@ type ProvisionedThroughput struct {
 
 // OutputResources defines the output resources for the Composition Function.
 type OutputResources struct {
-	DynamoDBTable resource.Composed  `json:"dynamoDBTable"`
+	DynamoDBTable resource.Composed `json:"dynamoDBTable"`
 	KinesisStream *resource.Composed `json:"kinesisStream,omitempty"`
 }
 
@@ -67,9 +61,9 @@ func Compose(ctx context.Context, in InputParameters) (*OutputResources, error) 
 						"name": in.TableName,
 					},
 					"spec": map[string]interface{}{
-						"billingMode":           in.BillingMode,
-						"attributeDefinitions":  in.AttributeDefinitions,
-						"keySchema":             in.KeySchema,
+						"billingMode":          in.BillingMode,
+						"attributeDefinitions": in.AttributeDefinitions,
+						"keySchema":            in.KeySchema,
 						"provisionedThroughput": in.ProvisionedThroughput,
 					},
 				},
