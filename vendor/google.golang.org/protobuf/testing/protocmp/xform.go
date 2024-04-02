@@ -160,32 +160,7 @@ func (m Message) String() string {
 	}
 }
 
-type transformer struct {
-	resolver protoregistry.MessageTypeResolver
-}
-
-func newTransformer(opts ...option) *transformer {
-	xf := &transformer{
-		resolver: protoregistry.GlobalTypes,
-	}
-	for _, opt := range opts {
-		opt(xf)
-	}
-	return xf
-}
-
-type option func(*transformer)
-
-// MessageTypeResolver overrides the resolver used for messages packed
-// inside Any. The default is protoregistry.GlobalTypes, which is
-// sufficient for all compiled-in Protobuf messages. Overriding the
-// resolver is useful in tests that dynamically create Protobuf
-// descriptors and messages, e.g. in proxies using dynamicpb.
-func MessageTypeResolver(r protoregistry.MessageTypeResolver) option {
-	return func(xf *transformer) {
-		xf.resolver = r
-	}
-}
+type option struct{}
 
 // Transform returns a [cmp.Option] that converts each [proto.Message] to a [Message].
 // The transformation does not mutate nor alias any converted messages.
@@ -197,9 +172,10 @@ func MessageTypeResolver(r protoregistry.MessageTypeResolver) option {
 // This does not directly transform higher-order composite Go types.
 // For example, []*foopb.Message is not transformed into []Message,
 // but rather the individual message elements of the slice are transformed.
-func Transform(opts ...option) cmp.Option {
-	xf := newTransformer(opts...)
-
+//
+// Note that there are currently no custom options for Transform,
+// but the use of an unexported type keeps the future open.
+func Transform(...option) cmp.Option {
 	// addrType returns a pointer to t if t isn't a pointer or interface.
 	addrType := func(t reflect.Type) reflect.Type {
 		if k := t.Kind(); k == reflect.Interface || k == reflect.Ptr {
@@ -242,7 +218,7 @@ func Transform(opts ...option) cmp.Option {
 		case !m.IsValid():
 			return Message{messageTypeKey: messageMeta{m: m.Interface(), md: m.Descriptor()}, messageInvalidKey: true}
 		default:
-			return xf.transformMessage(m)
+			return transformMessage(m)
 		}
 	}))
 }
@@ -255,7 +231,7 @@ func isMessageType(t reflect.Type) bool {
 	return t.Implements(messageV1Type) || t.Implements(messageV2Type)
 }
 
-func (xf *transformer) transformMessage(m protoreflect.Message) Message {
+func transformMessage(m protoreflect.Message) Message {
 	mx := Message{}
 	mt := messageMeta{m: m.Interface(), md: m.Descriptor(), xds: make(map[string]protoreflect.FieldDescriptor)}
 
@@ -267,11 +243,11 @@ func (xf *transformer) transformMessage(m protoreflect.Message) Message {
 		}
 		switch {
 		case fd.IsList():
-			mx[s] = xf.transformList(fd, v.List())
+			mx[s] = transformList(fd, v.List())
 		case fd.IsMap():
-			mx[s] = xf.transformMap(fd, v.Map())
+			mx[s] = transformMap(fd, v.Map())
 		default:
-			mx[s] = xf.transformSingular(fd, v)
+			mx[s] = transformSingular(fd, v)
 		}
 		return true
 	})
@@ -287,14 +263,15 @@ func (xf *transformer) transformMessage(m protoreflect.Message) Message {
 
 	// Expand Any messages.
 	if mt.md.FullName() == genid.Any_message_fullname {
+		// TODO: Expose Transform option to specify a custom resolver?
 		s, _ := mx[string(genid.Any_TypeUrl_field_name)].(string)
 		b, _ := mx[string(genid.Any_Value_field_name)].([]byte)
-		mt, err := xf.resolver.FindMessageByURL(s)
+		mt, err := protoregistry.GlobalTypes.FindMessageByURL(s)
 		if mt != nil && err == nil {
 			m2 := mt.New()
 			err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal(b, m2.Interface())
 			if err == nil {
-				mx[string(genid.Any_Value_field_name)] = xf.transformMessage(m2)
+				mx[string(genid.Any_Value_field_name)] = transformMessage(m2)
 			}
 		}
 	}
@@ -303,37 +280,37 @@ func (xf *transformer) transformMessage(m protoreflect.Message) Message {
 	return mx
 }
 
-func (xf *transformer) transformList(fd protoreflect.FieldDescriptor, lv protoreflect.List) interface{} {
+func transformList(fd protoreflect.FieldDescriptor, lv protoreflect.List) interface{} {
 	t := protoKindToGoType(fd.Kind())
 	rv := reflect.MakeSlice(reflect.SliceOf(t), lv.Len(), lv.Len())
 	for i := 0; i < lv.Len(); i++ {
-		v := reflect.ValueOf(xf.transformSingular(fd, lv.Get(i)))
+		v := reflect.ValueOf(transformSingular(fd, lv.Get(i)))
 		rv.Index(i).Set(v)
 	}
 	return rv.Interface()
 }
 
-func (xf *transformer) transformMap(fd protoreflect.FieldDescriptor, mv protoreflect.Map) interface{} {
+func transformMap(fd protoreflect.FieldDescriptor, mv protoreflect.Map) interface{} {
 	kfd := fd.MapKey()
 	vfd := fd.MapValue()
 	kt := protoKindToGoType(kfd.Kind())
 	vt := protoKindToGoType(vfd.Kind())
 	rv := reflect.MakeMapWithSize(reflect.MapOf(kt, vt), mv.Len())
 	mv.Range(func(k protoreflect.MapKey, v protoreflect.Value) bool {
-		kv := reflect.ValueOf(xf.transformSingular(kfd, k.Value()))
-		vv := reflect.ValueOf(xf.transformSingular(vfd, v))
+		kv := reflect.ValueOf(transformSingular(kfd, k.Value()))
+		vv := reflect.ValueOf(transformSingular(vfd, v))
 		rv.SetMapIndex(kv, vv)
 		return true
 	})
 	return rv.Interface()
 }
 
-func (xf *transformer) transformSingular(fd protoreflect.FieldDescriptor, v protoreflect.Value) interface{} {
+func transformSingular(fd protoreflect.FieldDescriptor, v protoreflect.Value) interface{} {
 	switch fd.Kind() {
 	case protoreflect.EnumKind:
 		return Enum{num: v.Enum(), ed: fd.Enum()}
 	case protoreflect.MessageKind, protoreflect.GroupKind:
-		return xf.transformMessage(v.Message())
+		return transformMessage(v.Message())
 	case protoreflect.BytesKind:
 		// The protoreflect API does not specify whether an empty bytes is
 		// guaranteed to be nil or not. Always return non-nil bytes to avoid

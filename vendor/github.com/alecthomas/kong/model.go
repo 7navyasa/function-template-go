@@ -162,16 +162,6 @@ func (n *Node) Summary() string {
 	} else if len(n.Children) > 0 {
 		summary += " <command>"
 	}
-	allFlags := n.Flags
-	if n.Parent != nil {
-		allFlags = append(allFlags, n.Parent.Flags...)
-	}
-	for _, flag := range allFlags {
-		if !flag.Required {
-			summary += " [flags]"
-			break
-		}
-	}
 	return summary
 }
 
@@ -378,9 +368,9 @@ func (v *Value) Reset() error {
 	v.Target.Set(reflect.Zero(v.Target.Type()))
 	if len(v.Tag.Envs) != 0 {
 		for _, env := range v.Tag.Envs {
-			envar, ok := os.LookupEnv(env)
+			envar := os.Getenv(env)
 			// Parse the first non-empty ENV in the list
-			if ok {
+			if envar != "" {
 				err := v.Parse(ScanFromTokens(Token{Type: FlagValueToken, Value: envar}), v.Target)
 				if err != nil {
 					return fmt.Errorf("%s (from envar %s=%q)", err, env, envar)
@@ -407,7 +397,6 @@ type Flag struct {
 	Xor         []string
 	PlaceHolder string
 	Envs        []string
-	Aliases     []string
 	Short       rune
 	Hidden      bool
 	Negated     bool
@@ -501,9 +490,6 @@ func reflectValueIsZero(v reflect.Value) bool {
 	default:
 		// This should never happens, but will act as a safeguard for
 		// later, as a default value doesn't makes sense here.
-		panic(&reflect.ValueError{
-			Method: "reflect.Value.IsZero",
-			Kind:   v.Kind(),
-		})
+		panic(&reflect.ValueError{"reflect.Value.IsZero", v.Kind()})
 	}
 }

@@ -1,23 +1,11 @@
 apiVersion: example.org/v1alpha1
-kind: Example
+kind: DynamoKinesisClaim
 metadata:
-  name: example
+  name: example-claim
 spec:
-  parameters:
-    tableName: "example-table"
-    billingMode: "PAY_PER_REQUEST"
-    attributeDefinitions:
-      - attributeName: "id"
-        attributeType: "S"
-    keySchema:
-      - attributeName: "id"
-        keyType: "HASH"
-    enableKinesisStream: true
-    kinesisStreamName: "example-stream"
-  composedTemplate:
-    ref:
-      apiVersion: example.org/v1alpha1
-      kind: ComposedTemplate
-    selector:
-      compositionFunction:
-        name: dynamodb-with-kinesis
+  dynamoDBTable:
+    tableName: example-table
+    billingMode: PAY_PER_REQUEST
+  kinesisStream:
+    streamName: example-stream
+    shardCount: 2

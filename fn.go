@@ -3,99 +3,55 @@ package main
 import (
 	"context"
 
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	unstructured "github.com/crossplane/crossplane-runtime/pkg/resource/unstructured"
-	composed "github.com/crossplane/crossplane-runtime/pkg/resource/unstructured/composed"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/kinesis"
+	ctrl "sigs.k8s.io/controller-runtime"
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
+	cpresource "github.com/crossplane/crossplane-runtime/pkg/resource"
 )
 
-// InputParameters defines the input parameters for the Composition Function.
-type InputParameters struct {
-	TableName            string                `json:"tableName"`
-	BillingMode          string                `json:"billingMode"`
-	AttributeDefinitions []AttributeDefinition `json:"attributeDefinitions"`
-	KeySchema            []KeySchema           `json:"keySchema"`
-	ProvisionedThroughput *ProvisionedThroughput `json:"provisionedThroughput,omitempty"`
-	EnableKinesisStream  bool                   `json:"enableKinesisStream"`
-	KinesisStreamName    string                `json:"kinesisStreamName,omitempty"`
-}
+type Composition struct{}
 
-// AttributeDefinition represents an attribute definition for the DynamoDB table.
-type AttributeDefinition struct {
-	AttributeName string `json:"attributeName"`
-	AttributeType string `json:"attributeType"`
-}
-
-// KeySchema represents the key schema for the DynamoDB table.
-type KeySchema struct {
-	AttributeName string `json:"attributeName"`
-	KeyType       string `json:"keyType"`
-}
-
-// ProvisionedThroughput represents the provisioned throughput settings for the DynamoDB table.
-type ProvisionedThroughput struct {
-	ReadCapacityUnits  int64 `json:"readCapacityUnits"`
-	WriteCapacityUnits int64 `json:"writeCapacityUnits"`
-}
-
-// OutputResources defines the output resources for the Composition Function.
-type OutputResources struct {
-	DynamoDBTable resource.Composed `json:"dynamoDBTable"`
-	KinesisStream *resource.Composed `json:"kinesisStream,omitempty"`
-}
-
-// IntermediateResources defines any intermediate resources needed for the Composition Function.
-type IntermediateResources struct {
-	// Define intermediate resources if needed
-}
-
-// Compose is the main function that composes the resources based on the input parameters.
-func Compose(ctx context.Context, in InputParameters) (*OutputResources, error) {
-	// Create the DynamoDB table resource
-	dynamoDBTable := composed.NewComposed(
-		&unstructured.UnstructuredExtensionObject{
-			Spec: unstructured.UnstructuredExtension{
-				Object: &unstructured.UnstructuredObject{
-					"apiVersion": "dynamodb.aws.crossplane.io/v1alpha1",
-					"kind":       "Table",
-					"metadata": map[string]interface{}{
-						"name": in.TableName,
-					},
-					"spec": map[string]interface{}{
-						"billingMode":          in.BillingMode,
-						"attributeDefinitions": in.AttributeDefinitions,
-						"keySchema":            in.KeySchema,
-						"provisionedThroughput": in.ProvisionedThroughput,
-					},
-				},
-			},
-		},
-	)
-
-	var kinesisStream *resource.Composed
-	if in.EnableKinesisStream {
-		// Create the Kinesis Stream resource
-		kinesisStream = composed.NewComposed(
-			&unstructured.UnstructuredExtensionObject{
-				Spec: unstructured.UnstructuredExtension{
-					Object: &unstructured.UnstructuredObject{
-						"apiVersion": "streams.aws.crossplane.io/v1alpha1",
-						"kind":       "Stream",
-						"metadata": map[string]interface{}{
-							"name": in.KinesisStreamName,
-						},
-						"spec": map[string]interface{}{
-							"streamModeDetails": map[string]interface{}{
-								"streamMode": "PROVISIONED",
-							},
-						},
-					},
-				},
-			},
-		)
+func (c *Composition) Compose(ctx context.Context, mg cpresource.Managed, clm cpresource.Claim) (cpresource.Composed, error) {
+	// Compose the desired DynamoDB table and Kinesis stream based on the claim
+	dynamoDBTable, err := composeDynamoDBTable(ctx, mg, clm)
+	if err != nil {
+		return cpresource.Composed{}, err
 	}
 
-	return &OutputResources{
-		DynamoDBTable: dynamoDBTable,
-		KinesisStream: kinesisStream,
+	kinesisStream, err := composeKinesisStream(ctx, mg, clm)
+	if err != nil {
+		return cpresource.Composed{}, err
+	}
+
+	return cpresource.Composed{
+		Resources: []cpresource.ComposedResource{
+			dynamoDBTable,
+			kinesisStream,
+		},
 	}, nil
+}
+
+func composeDynamoDBTable(ctx context.Context, mg cpresource.Managed, clm cpresource.Claim) (cpresource.ComposedResource, error) {
+	// Implement the logic to compose the desired DynamoDB table based on the claim
+	return cpresource.ComposedResource{}, nil
+}
+
+func composeKinesisStream(ctx context.Context, mg cpresource.Managed, clm cpresource.Claim) (cpresource.ComposedResource, error) {
+	// Implement the logic to compose the desired Kinesis stream based on the claim
+	return cpresource.ComposedResource{}, nil
+}
+
+func (c *Composition) Render(ctx context.Context, mg cpresource.Managed, res cpresource.Composed) error {
+	// Render the composed resources to the managed resource
+	return nil
+}
+
+func (c *Composition) Observe(ctx context.Context, mg cpresource.Managed) (cpresource.Managed, error) {
+	// Observe the current state of the DynamoDB table and Kinesis stream
+	return mg, nil
 }
